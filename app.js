@@ -1,4 +1,4 @@
-'use strict'; 
+'use strict';
 
 var App = {};
 
@@ -20,7 +20,7 @@ App.init = function(){
         var ding = new Audio();
         ding.src = './media/ding' + ext;
         ding.volume = 0.5;
-        
+
         var sweep = new Audio();
         sweep.src = './media/sweep' + ext;
         sweep.volume = 0.3;
@@ -60,19 +60,23 @@ App.play = function(sound){
 
 App.addWin = function(puzNum){
     if(window['localStorage']){
-        var wins = localStorage.setItem['wins'];
+        var wins = localStorage['wins'];
         if(!wins){
-            wins = [];   
+            wins = [];
+        } else {
+            wins = JSON.parse(wins);
         }
         wins.push(puzNum);
-        localStorage.setItem['wins'] = wins;
+        localStorage['wins'] = JSON.stringify(wins);
     }
 }
 
 App.getWins = function(){
     if(window['localStorage']){
-        var wins = localStorage.setItem['wins'];
-        if(!wins){
+        var wins = localStorage['wins'];
+        if(wins){
+            wins = JSON.parse(wins);
+        } else {
             wins = [];
         }
         return wins;
@@ -85,7 +89,7 @@ App.getWins = function(){
 App.Router = Backbone.Router.extend({
 
     currentView: null,
-    
+
     routes: {
         '': 'showHome',
         ':number': 'showPuzzle',
@@ -97,7 +101,7 @@ App.Router = Backbone.Router.extend({
             this.currentView.remove();
         }
     },
-    
+
     showHome: function() {
 
         $('.content').fadeOut(function(){
@@ -114,14 +118,14 @@ App.Router = Backbone.Router.extend({
             App.router.currentView = App.homeView;
 
             $('.puznum').focus();
-            
+
             $('.content').fadeIn();
 
         });
 
 
-    }, 
-    
+    },
+
     showPuzzle: function(puzNum) {
 
         $('.content').fadeOut(function(){
@@ -130,7 +134,7 @@ App.Router = Backbone.Router.extend({
 
             document.title = App.name + ' / Puzzle ' + puzNum;
              $('.titlenum').text('#' + puzNum);
-            
+
             App.puzzleView.render(puzNum);
 
             $('.content').html(App.puzzleView.$el);
@@ -228,7 +232,7 @@ App.HomeView = Backbone.View.extend({
             App.router.navigate(puzNum+'', {trigger: true});
         }
 
-    }, 
+    },
 
     randomPuzzle: function(){
 
@@ -257,6 +261,7 @@ App.PuzzleView = Backbone.View.extend({
     total: 0,
     puzNum: 0,
     data: null,
+    hinting: false,
 
     events: function(){
 
@@ -360,7 +365,7 @@ App.PuzzleView = Backbone.View.extend({
         for(var i = 0; i < $('.square').length; i++){
 
             $('.square').eq(i).text(squares[i]);
-            
+
             var h = hidden.indexOf(squares[i]);
             if(h !== -1){
                 delete hidden[h];
@@ -372,9 +377,15 @@ App.PuzzleView = Backbone.View.extend({
         }
 
 
-    }, 
+    },
 
     doHint: function(e){
+
+        if(this.hinting){
+            return;
+        }
+
+
 
         var active = [];
 
@@ -389,58 +400,63 @@ App.PuzzleView = Backbone.View.extend({
         var rand = Math.floor(Math.random() * active.length);
         var $clue = active[rand];
 
-        var b = rot13($clue.data('answer'));
-            
-        b = b.substr(0,3);
-                                
-        $('.square').each(function(index){
-        
-            if($(this).data('guessed') !== 'true'){
-            
-                var s = $(this).text();
-                
-                if(b.indexOf(s) == 0){
-                    $clue.fadeOut('slow', function(){
-                        $clue.fadeIn();
-                    });
-                    $(this).fadeOut('slow', function(){
-                        $(this).fadeIn();
-                    });
 
+        var answer = rot13($clue.data('answer'));
+
+        var b = answer.substr(0,3);
+        var view = this;
+
+        $('.square').each(function(index){
+
+            if($(this).data('guessed') !== 'true'){
+
+                var s = $(this).text();
+                var $square = $(this);
+
+                if(b.indexOf(s) == 0){
+                    view.hinting = true;
+                    $clue.toggleClass('hint');
+                    $square.toggleClass('hint');
+                    setTimeout(function(){
+                        $clue.toggleClass('hint');
+                        $square.toggleClass('hint');
+                        view.hinting = false;
+                    }, 4000);
+                    return false;
                 }
-                
+
             }
-        
+
         });
 
     },
 
     doSquare: function(e){
-      
-      if(App.puzzleView.guessing == false){ 
+
+      if(App.puzzleView.guessing == false){
             var sq = e.target;
-            
+
             $(sq).data('guessed','true');
-       
+
             $(sq).hide();
-            
+
             var a = $('.answertext').text();
-            
+
             a = a + $(sq).text();
-            
+
             $('.answertext').html(a);
 
             if(a.length > 10){
                 App.puzzleView.doReset(e);
             } else {
-                App.puzzleView.doGuess(a);        
+                App.puzzleView.doGuess(a);
             }
         }
 
     },
-    
+
     doGuess: function(a){
-        
+
         if(a == ''){
             return;
         }
@@ -448,19 +464,19 @@ App.PuzzleView = Backbone.View.extend({
         var $clues = $('.clues li');
 
         App.puzzleView.guessing = true;
-        
+
         for(var i = 0; i < $clues.length; i++){
 
             var $clue = $clues.eq(i);
 
             var b = rot13($clue.data('answer'));
-            
+
             if( a.toLowerCase() == b.toLowerCase()){
-                
+
                 App.play('ding');
 
                 $clue.data('answer','');
-                
+
                 $('.answertext').fadeOut('fast',function(){
                     $('.answertext').html('');
                     $('.answertext').show();
@@ -470,51 +486,51 @@ App.PuzzleView = Backbone.View.extend({
                     $(this).html(b).addClass('correct');
                     $(this).fadeIn();
                 });
-                
+
                 $clue.find('.def').fadeOut(function(){
                     $(this).css({'text-decoration':'line-through','font-style':'italic'});
                     $(this).fadeIn();
                 });
-                
+
                 $('.square').each(function(index){
-                    $(this).data('guessed',''); 
+                    $(this).data('guessed','');
                 });
-                
+
                 App.puzzleView.count++;
-                
+
                 if(App.puzzleView.count == App.puzzleView.total){
                     App.puzzleView.doWin();
                     return;
                 }
- 
+
                 break;
 
             }
-            
+
         }
-        
+
         App.puzzleView.guessing = false;
 
 
-    }, 
+    },
 
     doWin: function(){
 
         App.puzzleView.stopTimer();
 
         App.addWin(App.puzzleView.puzNum);
-        
+
         App.play('sweep');
-        
+
         setTimeout(function() {
 
             $('.squares table').fadeOut();
             $('.hint').hide();
             $('.shuffle').hide();
-            
+
             var tpl = $('.winTemplate').text();
             var html = _.template(tpl, {});
-            
+
             $('.squares').html(html);
 
         }, 1000);
@@ -531,24 +547,24 @@ App.PuzzleView = Backbone.View.extend({
     },
 
     doReset: function(e){
- 
+
         $('.answertext').html('');
         //$('.answertext').css('color','');
 
         $('.square').each(function(index){
-            
+
             if($(this).data('guessed') == 'true'){
-                $(this).data('guessed',''); 
+                $(this).data('guessed','');
                 $(this).fadeIn();
             }
-            
+
         });
     },
 
     stopTimer: function(){
         clearInterval(App.puzzleView.intervalID);
         App.puzzleView.intervalID = null;
-    }, 
+    },
 
     startTimer: function(){
         if(App.puzzleView.intervalID == null){
@@ -594,7 +610,7 @@ function rot13(str) {
     return String.fromCharCode((c <= 'Z' ? 90 : 122) >= (c = c.charCodeAt(0) + 13) ? c : c - 26);
   });
 }
-    
+
 function shuffle(arr) {
     for(var j, x, i = arr.length; i; j = parseInt(Math.random() * i), x = arr[--i], arr[i] = arr[j], arr[j] = x);
     return arr;
